@@ -1,5 +1,16 @@
+import json
+from pathlib import Path
 from datetime import datetime
 from db import supabase
+
+def getBudgetPresets():
+    try:
+        with open(Path(r"data\bank\presets.json"), "r") as file:
+            data = json.load(file)
+            return data
+    except Exception as e:
+        print(e)
+        return False
 
 def insertRecord(name:str,amount:float,date:str,_type:str,categories:list):
     try:

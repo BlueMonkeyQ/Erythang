@@ -1,0 +1,27 @@
+{   
+    "50/20/30":{
+        "essentials": 50,
+        "savings": 20,
+        "spending": 30
+    },
+    "10/10/80":{
+        "essentials": 10,
+        "savings": 10,
+        "spending": 80
+    },
+    "20/20/60":{
+        "essentials": 20,
+        "savings": 20,
+        "spending": 60
+    },
+    "30/30/40":{
+        "essentials": 30,
+        "savings": 30,
+        "spending": 40
+    },
+    "40/40/20":{
+        "essentials": 40,
+        "savings": 40,
+        "spending": 20
+    }
+}

@@ -4,7 +4,7 @@ from views.steam import steamView
 
 
 st.set_page_config()
-st.title("Yo")
+st.title("Erythang")
 
 bankView()
 # steamView()
