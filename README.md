@@ -1,8 +1,11 @@
 
 
 ## TODO
+
+### Bank
 []  Add more Categories
 []  Category Filter
+[]  Table + Income - Else (Green & Red)
 []  Themes
 [x]  Average Income
 [x]  Average Bills

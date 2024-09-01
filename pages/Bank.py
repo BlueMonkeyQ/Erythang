@@ -6,6 +6,8 @@ from datetime import datetime
 from api import bank
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
+st.set_page_config(page_title="Bank", page_icon="💰")
+
 @st.cache_data
 def get_bank_records():
     return bank.getRecords()
@@ -254,7 +256,9 @@ def recordGraphs(df:pd.DataFrame):
         percentage_change = round(((current_amount - year_average_amount) / year_average_amount) * 100, 2)
 
         # Display Metrics
-        columns[i].metric(label=metric, value=current_amount, delta=percentage_change, delta_color="inverse" if metric in red_metrics else "normal")
+        columns[i].metric(label=metric, value=current_amount, delta=f"{percentage_change}%", 
+                          delta_color="inverse" if metric in red_metrics else "normal", 
+                          help=f"Yearly Average: {year_average_amount}")
 
     # Total Income for Month
     total_income = filtered_df_month[filtered_df_month['type'] == 'Income']['amount'].sum()
@@ -311,3 +315,5 @@ def budgetBreakdown():
     )
 
     st.plotly_chart(fig_pie)
+
+bankView()
