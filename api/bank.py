@@ -1,11 +1,11 @@
 import json
 from pathlib import Path
 from datetime import datetime
-from db import supabase
+from supabaseDB import Supabase
 
 def getBudgetPresets():
     try:
-        with open(Path(r"data\bank\presets.json"), "r") as file:
+        with open(Path(r"data/bank/presets.json"), "r") as file:
             data = json.load(file)
             return data
     except Exception as e:
@@ -26,7 +26,7 @@ def insertRecord(name:str,amount:float,date:str,_type:str,categories:list):
     except Exception as e:
         print(e)
         return False
-    
+
 def updateRecord(id:int,name:str,amount:float,date:str,_type:str,categories:list):
     try:
         supabase.from_("bank")\
@@ -42,7 +42,7 @@ def updateRecord(id:int,name:str,amount:float,date:str,_type:str,categories:list
     except Exception as e:
         print(e)
         return False
-    
+
 def deleteRecord(id:int):
     try:
         supabase.from_("bank")\
@@ -52,7 +52,7 @@ def deleteRecord(id:int):
     except Exception as e:
         print(e)
         return False
-    
+
 def getRecords():
     try:
         records = supabase.from_("bank")\

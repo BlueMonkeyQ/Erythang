@@ -72,7 +72,7 @@ def recordForm(df:pd.DataFrame, edit_id=None):
         amount = st.number_input("Amount",value=amount, min_value=0.00, format="%.2f")
         date = st.date_input("Date", value=date)
         _type = st.selectbox(
-            "Type", 
+            "Type",
             options=["Income", "Bill", "Expense", "Other"],
             index=["Income", "Bill", "Expense", "Other"].index(_type) if _type in ["Income", "Bill", "Expense", "Other"] else 0
         )
@@ -82,7 +82,7 @@ def recordForm(df:pd.DataFrame, edit_id=None):
             default=categories
         )
         submitted = st.form_submit_button(label="Submit")
-        
+
     delete = st.button(label="Delete",key="delete",disabled=delete_button)
     if submitted:
         if not name:
@@ -124,13 +124,13 @@ def recordForm(df:pd.DataFrame, edit_id=None):
         else:
             st.cache_data.clear()
             st.success("Record deleted")
-    
+
 def recordTable(df:pd.DataFrame):
     # Filter
     if df.empty:
         st.warning("No records found")
         return None
-    
+
     unique_types = df['type'].unique().tolist()
     unique_types.insert(0, "All")
     selected_type = st.selectbox("Filter by Type", options=unique_types)
@@ -170,7 +170,7 @@ def recordGraphs(df:pd.DataFrame):
     df['month'] = pd.Categorical(df['month'], categories=[
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'], ordered=True)
-    
+
     # Filter
     years = df['year'].unique()
     selected_year = st.selectbox("Select Year", options=sorted(years, reverse=True))
@@ -256,8 +256,8 @@ def recordGraphs(df:pd.DataFrame):
         percentage_change = round(((current_amount - year_average_amount) / year_average_amount) * 100, 2)
 
         # Display Metrics
-        columns[i].metric(label=metric, value=current_amount, delta=f"{percentage_change}%", 
-                          delta_color="inverse" if metric in red_metrics else "normal", 
+        columns[i].metric(label=metric, value=current_amount, delta=f"{percentage_change}%",
+                          delta_color="inverse" if metric in red_metrics else "normal",
                           help=f"Yearly Average: {year_average_amount}")
 
     # Total Income for Month
