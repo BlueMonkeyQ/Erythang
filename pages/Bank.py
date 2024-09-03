@@ -20,6 +20,10 @@ def bankView():
 
     df = pd.DataFrame()
     records = get_bank_records()
+    if records is False:
+        st.write("Error getting Bank Records")
+        return False
+
     for record in records:
         row = pd.DataFrame([record])
         df = pd.concat([df,row], ignore_index=True)

@@ -185,11 +185,57 @@ class Supabase:
     def getSteamUserGames(self):
         try:
             response = self.supabase.from_("steamusergames")\
-            .select("*")\
+            .select("*, steamgames(*)")\
             .execute()
             data = response.data
 
             return data
+
+        except Exception as e:
+            print(e)
+            return False
+
+# STEAM USER ACHIEVEMENTS
+    def existSteamUserAchievementsDB(self, id):
+        try:
+            response = self.supabase.from_("steamuserachievements")\
+            .select("*")\
+            .eq(column="id", value=id)\
+            .execute()
+            data = response.data
+
+            if data:
+                return True
+            else:
+                return False
+
+        except Exception as e:
+            print(e)
+            return False
+
+    def insertSteamUserAchievementsDB(self, id, data):
+        try:
+            self.supabase.from_("steamuserachievements")\
+            .insert({
+                "achievement_id": id,
+                "achieved": data['achieved'],
+                "unlocktime": data['unlocktime']
+            })\
+            .execute()
+
+        except Exception as e:
+            print(e)
+            return False
+
+    def updateSteamUserAchievementsDB(self, id, data):
+        try:
+            self.supabase.from_("steamuserachievements")\
+            .update({
+                "achieved": data['achieved'],
+                "unlocktime": data['unlocktime']
+            })\
+            .eq(column='achievement_id',value=id)\
+            .execute()
 
         except Exception as e:
             print(e)
@@ -251,6 +297,50 @@ class Supabase:
                 "icongray": icongray
             })\
             .execute()
+
+        except Exception as e:
+            print(e)
+            return False
+
+    def getSteamAchievements(self,app_id,name):
+        try:
+            response = self.supabase.from_("steamachievements")\
+            .select("*")\
+            .eq(column="app_id", value=app_id)\
+            .eq(column="name", value=name)\
+            .execute()
+            data = response.data
+
+            return data
+
+        except Exception as e:
+            print(e)
+            return False
+
+# GENERAL
+    def steamLibraryDetailView(self, appid):
+        try:
+            response = self.supabase.from_("steamgames")\
+            .select("*, steamusergames(*)")\
+            .eq(column="app_id", value=appid)\
+            .execute()
+            data = response.data
+
+            return data[0]
+
+        except Exception as e:
+            print(e)
+            return False
+
+    def steamLibraryAchivementsView(self,appid):
+        try:
+            response = self.supabase.from_("steamachievements")\
+            .select("*, steamuserachievements(*)")\
+            .eq(column="app_id", value=appid)\
+            .execute()
+            data = response.data
+
+            return data
 
         except Exception as e:
             print(e)
