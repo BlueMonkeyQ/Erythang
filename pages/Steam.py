@@ -7,6 +7,9 @@ from pathlib import Path
 from streamlit_card import card
 from api.steam import SteamAPI
 from supabaseDB import Supabase
+from datetime import datetime
+import plotly.express as px
+import plotly.graph_objects as go
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -88,9 +91,10 @@ def steamLibrarySearch(df:pd.DataFrame):
         filtered_df = df.loc[df['name'] == search_query]
         app_id = filtered_df['app_id'].values[0]
         set_clicked_id(filtered_df['app_id'].values[0])
+        return None
 
-    elif st.session_state.clicked_id != None:
-        filtered_df = df.loc[df['name'] == search_query]
+    # elif st.session_state.clicked_id != None:
+    #     filtered_df = df.loc[df['name'] == search_query]
 
     else:
         filtered_df = df.copy()
@@ -123,7 +127,8 @@ def steamLibraryView():
         return False
 
     filterd_df = steamLibrarySearch(df)
-    steamLibraryCards(filterd_df)
+    if filterd_df is not None:
+        steamLibraryCards(filterd_df)
 
 def steamLibraryDetailView():
     if st.session_state.clicked_id is None:
@@ -136,8 +141,62 @@ def steamLibraryDetailView():
         return False
 
     st.title(data['name'])
-
     st.image(image=data['header_img'], use_column_width=True)
+
+    # Get Achievements
+    try:
+        achievements = supabase.steamLibraryAchivementsView(app_id)
+        if achievements is False:
+            st.warning("Error getting Steam Library Achievements")
+            return False
+
+        achievements_df = pd.DataFrame()
+        for i in achievements:
+            unlocktime = int(i['steamuserachievements'][0]['unlocktime'])
+            achieved = i['steamuserachievements'][0]['achieved']
+
+            if unlocktime is not None and achieved:
+                unlocktime = datetime.fromtimestamp(unlocktime)
+                formatted_unlocktime = unlocktime.strftime('%b %d %Y %I:%M%p')
+            else:
+                unlocktime = None
+                formatted_unlocktime = None
+
+            dict = {
+                'name': i['name'],
+                'Achievement': i['display_name'],
+                'hidden': i['hidden'],
+                'icon': i['icon'],
+                'icongrey': i['icongray'],
+                'Achieved': achieved,
+                'unlocktime': unlocktime,
+                'Unlocked': formatted_unlocktime
+            }
+            new_df = pd.DataFrame([dict])
+            achievements_df = pd.concat([achievements_df,new_df], ignore_index=True)
+
+    except Exception as e:
+        st.warning("Error getting Steam Library Achievements")
+        achievements_df = None
+        pass
+
+    # Tabs
+    if achievements_df is not None:
+        tab1, tab2, tab3 = st.tabs(tabs=["Info","Table","Graph"])
+
+        with tab1:
+            steamLibraryDetailViewInfoTab(data)
+
+        with tab2:
+            steamLibraryDetailViewTableTab(achievements_df)
+
+        with tab3:
+            steamLibraryDetailViewGraphTab(achievements_df)
+
+    # Update Achievements
+    updateSteamUserAchievements(app_id)
+
+def steamLibraryDetailViewInfoTab(data):
     st.write(data['short_description'])
     st.write(f"Developers: {data['developers']}")
     st.write(f"Publishers: {data['publishers']}")
@@ -164,28 +223,103 @@ def steamLibraryDetailView():
             filepath = str(Path(r"data/images/linux.png"))
             st.image(image=filepath,width=50)
 
-    achievements = supabase.steamLibraryAchivementsView(app_id)
-    if achievements is False:
-        st.warning("Error getting Steam Library Achievements")
-        return False
+def steamLibraryDetailViewTableTab(df:pd.DataFrame):
+    # Achievements
+    try:
+        # Progress Bar
+        total_achievements = len(df)
+        total_achieved = len(df.loc[df['Achieved'] == True])
+        progress = total_achieved / total_achievements
 
-    st.write(achievements[0])
-    achievements_df = pd.DataFrame()
-    updateSteamUserAchievements(app_id)
-    for i in achievements:
-        dict = {
-            'name': i['name'],
-            'display_name': i['display_name'],
-            'hidden': i['hidden'],
-            'icon': i['icon'],
-            'icongrey': i['icongray'],
-            'achieved': i['steamuserachievements'][0]['achieved'],
-            'unlocktime': i['steamuserachievements'][0]['unlocktime'],
-        }
-        new_df = pd.DataFrame([dict])
-        achievements_df = pd.concat([achievements_df,new_df], ignore_index=True)
+        st.subheader(f"{total_achieved}/{total_achievements} Achievements Unlocked")
+        st.progress(value=progress)
+        df['Logo'] = df.apply(lambda x: x['icon'] if x['Achieved'] else x['icongrey'], axis=1)
 
-    st.dataframe(achievements_df)
+        # Achievments Table
+        st.data_editor(
+            df,
+            column_order=['Logo','Achievement','Achieved','Unlocked'],
+            column_config={
+                'Logo': st.column_config.ImageColumn(),
+            },
+            use_container_width=True
+        )
+
+    except Exception as e:
+        st.warning(f"Error getting Steam Library Achievements {e}")
+        pass
+
+def steamLibraryDetailViewGraphTab(df:pd.DataFrame):
+    # Graphs
+    try:
+        df['year'] = df['unlocktime'].dt.year
+        df['month'] = df['unlocktime'].dt.month
+
+        col1, col2 = st.columns(2)
+        with col1:
+            filter_year = st.button("Filter By Year", use_container_width=True)
+
+        with col2:
+            filter_month = st.button("Filter By Month", use_container_width=True)
+
+    # By Year
+        if filter_year:
+            achievements_per_year = df.groupby('year')['Achieved'].sum().reset_index()
+            fig = go.Figure()
+
+            # Add bar trace
+            fig.add_trace(go.Bar(
+                x=achievements_per_year['year'],
+                y=achievements_per_year['Achieved'],
+                name='Achievements Unlocked',
+                marker_color='indianred'
+            ))
+
+            # Add line trace
+            fig.add_trace(go.Scatter(
+                x=achievements_per_year['year'],
+                y=achievements_per_year['Achieved'],
+                name='Achievements Unlocked (Line)',
+                mode='lines+markers',
+                line=dict(color='royalblue')
+            ))
+
+            fig.update_layout(
+                title='Achievements Unlocked Per Year',
+                xaxis=dict(title='Year'),
+                yaxis=dict(title='Achievements Unlocked'),
+                barmode='group'
+            )
+
+            fig.update_xaxes(tickmode='array', tickvals=achievements_per_year['year'])
+            st.plotly_chart(fig)
+
+    # By Month
+        if filter_month:
+            achievements_per_month = df.groupby(['year', 'month'])['Achieved'].sum().reset_index()
+            achievements_per_month_pivot = achievements_per_month.pivot(index='month', columns='year', values='Achieved').fillna(0)
+
+            fig = go.Figure()
+
+            for year in achievements_per_month_pivot.columns:
+                fig.add_trace(go.Bar(
+                    x=achievements_per_month_pivot.index,
+                    y=achievements_per_month_pivot[year],
+                    name=str(year)
+                ))
+
+            fig.update_layout(
+                title='Achievements Unlocked Per Month Grouped by Year',
+                xaxis=dict(title='Month', tickmode='array', tickvals=list(range(1, 13)), ticktext=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']),
+                yaxis=dict(title='Achievements Unlocked'),
+                barmode='stack'
+            )
+
+            st.plotly_chart(fig)
+
+    except Exception as e:
+        st.warning(f"Error Graphing Steam Library Achievements {e}")
+        pass
 
 def updateSteamUserAchievements(app_id):
     if st.button("Update Achievements",use_container_width=True):
@@ -212,7 +346,6 @@ def updateSteamUserAchievements(app_id):
                     if supabase.insertSteamUserAchievementsDB(id=id,data=achievement)  is False:
                         print(f"Error inserting Steam Achievements {app_id} {achievement['apiname']}")
                         continue
-
 
 def updateSteamLibrary():
     if st.button("Update Steam Library"):
