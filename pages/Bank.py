@@ -5,12 +5,23 @@ import plotly.graph_objects as go
 from datetime import datetime
 from api import bank
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from supabaseDB import Supabase
 
+supabase = Supabase()
 st.set_page_config(page_title="Bank", page_icon="💰")
 
 @st.cache_data
 def get_bank_records():
-    return bank.getRecords()
+    records = supabase.getBankRecords()
+    if records is False:
+        return False
+
+    df = pd.DataFrame()
+    for record in records:
+        row = pd.DataFrame([record])
+        df = pd.concat([df,row], ignore_index=True)
+
+    return df
 
 @st.cache_data
 def get_bank_budget_presets():
@@ -18,15 +29,10 @@ def get_bank_budget_presets():
 
 def bankView():
 
-    df = pd.DataFrame()
-    records = get_bank_records()
-    if records is False:
-        st.write("Error getting Bank Records")
+    df = get_bank_records()
+    if df is False:
+        st.error("Failed to get Bank records")
         return False
-
-    for record in records:
-        row = pd.DataFrame([record])
-        df = pd.concat([df,row], ignore_index=True)
 
     tab1, tab2, tab3 = st.tabs(tabs=["Records","Graph", "Budget"])
 
@@ -93,7 +99,7 @@ def recordForm(df:pd.DataFrame, edit_id=None):
             st.warning("Name is required")
 
         elif edit_id is None:
-            response = bank.insertRecord(
+            response = supabase.insertBankRecord(
                 name=name,
                 amount=round(amount,2),
                 date=date.strftime("%Y-%m-%d"),
@@ -107,7 +113,7 @@ def recordForm(df:pd.DataFrame, edit_id=None):
                 st.success("Record inserted")
 
         else:
-            response = bank.updateRecord(
+            response = supabase.updateBankRecord(
                 id=edit_id,
                 name=name,
                 amount=amount,
@@ -122,7 +128,7 @@ def recordForm(df:pd.DataFrame, edit_id=None):
                 st.success("Record updated")
 
     elif delete:
-        response = bank.deleteRecord(id=edit_id)
+        response = supabase.deleteBankRecord(id=edit_id)
         if response:
             st.warning("Failed to delete record")
         else:
