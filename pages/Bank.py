@@ -7,8 +7,17 @@ from api import bank
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from supabaseDB import Supabase
 
+#@TODO:
+# - update graphs
+# - more sub transaction types
+# - allow user to create sub transaction types
+# - update records with sub transaction types
+
 supabase = Supabase()
 st.set_page_config(page_title="Bank", page_icon="💰")
+
+if 'file_id' not in st.session_state:
+    st.session_state.file_id = 0
 
 @st.cache_data
 def get_bank_records():
@@ -27,32 +36,82 @@ def get_bank_records():
 def get_bank_budget_presets():
     return bank.getBudgetPresets()
 
-def bankView():
+@st.cache_data
+def get_transaction_types():
+    transaction_types_dict = bank.getTransactionTypes()
+    if transaction_types_dict is False:
+        return False, False
+    else:
+        transaction_types_list = [i for i in transaction_types_dict['Transaction Types'].keys()]
+        return transaction_types_dict, transaction_types_list
 
-    df = get_bank_records()
-    if df is False:
-        st.error("Failed to get Bank records")
+def statementImport(df:pd.DataFrame, transaction_types:dict):
+    for index, row in df.iterrows():
+        try:
+            date = row['Date']
+            date = datetime.strptime(date, "%Y-%m-%d").strftime("%Y-%m-%d")
+            name = str(row['Name'])
+            amount = round(float(row['Amount']),2)
+
+            if amount < 0:
+                _type = 0
+            else:
+                _type = 1
+
+            amount = abs(amount)
+            transaction = "Unknown"
+
+            for key in transaction_types['Transaction Types'].keys():
+                for i in key:
+                    if i.upper() in name.upper():
+                        transaction = key
+                        break
+
+        except Exception as e:
+            print(e)
+            continue
+
+        try:
+            duplicate = supabase.getBankRecordsDuplicate({"name":name,"amount":amount,"date":date})
+            print(f"Duplicate: {duplicate}")
+
+            if duplicate:
+                print(f"Duplicate Record Name: {name}, Amount: {amount}, Date: {date}")
+                continue
+
+            else:
+                print(f"Inserting Bank Record Name: {name}, Amount: {amount}, Date: {date}, Type: {_type} Transaction: {transaction}")
+
+                supabase.insertBankRecord(
+                    name=name,
+                    amount=amount,
+                    date=date,
+                    _type=_type,
+                    transaction=transaction,
+                    categories=""
+                )
+
+        except Exception as e:
+            print(e)
+            continue
+
+    st.cache_data.clear()
+
+def statementImportButton(disabled:bool):
+    uploaded_file = st.file_uploader("Choose a CSV file", type="csv",disabled=disabled, key=st.session_state.file_id)
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
+
+        if df.empty:
+            st.warning("File is empty")
+            return False
+        else:
+            return df
+
+    else:
         return False
 
-    tab1, tab2, tab3 = st.tabs(tabs=["Records","Graph", "Budget"])
-
-    # Table
-    with tab1:
-        id = recordTable(df)
-        if id is None:
-            recordForm(df)
-        else:
-            recordForm(df,edit_id=id)
-
-    # Graph
-    with tab2:
-        recordGraphs(df)
-
-    # Budget
-    with tab3:
-        budgetBreakdown()
-
-def recordForm(df:pd.DataFrame, edit_id=None):
+def recordForm(df:pd.DataFrame, transaction_types:list, transaction_types_dict:dict, edit_id=None):
 
     # Get Editid record
     if edit_id != None:
@@ -61,8 +120,6 @@ def recordForm(df:pd.DataFrame, edit_id=None):
         amount = record['amount'].values[0]
         date = datetime.strptime(record['date'].values[0], "%Y-%m-%d")
         _type = record['type'].values[0]
-        categories = record['categories'].values[0]
-        if len(categories) == 0: categories = []
         title="Edit"
         delete_button = False
 
@@ -71,7 +128,6 @@ def recordForm(df:pd.DataFrame, edit_id=None):
         amount = 0.00
         date = datetime.today()
         _type = "Income"
-        categories = []
         title="Insert"
         delete_button = True
 
@@ -82,18 +138,27 @@ def recordForm(df:pd.DataFrame, edit_id=None):
         amount = st.number_input("Amount",value=amount, min_value=0.00, format="%.2f")
         date = st.date_input("Date", value=date)
         _type = st.selectbox(
-            "Type",
-            options=["Income", "Bill", "Expense", "Other"],
-            index=["Income", "Bill", "Expense", "Other"].index(_type) if _type in ["Income", "Bill", "Expense", "Other"] else 0
-        )
-        categories = st.multiselect(
-            "Categories",
-            options=["Test"],
-            default=categories
+            "Transaction Types",
+            options=transaction_types,
+            index=transaction_types.index(_type) if _type in transaction_types else 0
         )
         submitted = st.form_submit_button(label="Submit")
 
-    delete = st.button(label="Delete",key="delete",disabled=delete_button)
+    delete = st.button(label="Delete",
+        key="delete",
+        disabled=delete_button,
+        use_container_width=True
+    )
+
+    statement_df = statementImportButton(disabled= not delete_button)
+    if statement_df is False:
+        pass
+    else:
+        with st.spinner("Importing Statement..."):
+            statementImport(df=statement_df,
+                transaction_types=transaction_types_dict)
+        st.session_state.file_id += 1
+
     if submitted:
         if not name:
             st.warning("Name is required")
@@ -104,7 +169,7 @@ def recordForm(df:pd.DataFrame, edit_id=None):
                 amount=round(amount,2),
                 date=date.strftime("%Y-%m-%d"),
                 _type=_type,
-                categories=",".join(categories)
+                categories=""
             )
             if response is False:
                 st.warning("Failed to insert record")
@@ -119,7 +184,7 @@ def recordForm(df:pd.DataFrame, edit_id=None):
                 amount=amount,
                 date=date.strftime("%Y-%m-%d"),
                 _type=_type,
-                categories=",".join(categories)
+                categories=""
             )
             if response is False:
                 st.warning("Failed to update record")
@@ -127,7 +192,7 @@ def recordForm(df:pd.DataFrame, edit_id=None):
                 st.cache_data.clear()
                 st.success("Record updated")
 
-    elif delete:
+    elif delete and edit_id is not None:
         response = supabase.deleteBankRecord(id=edit_id)
         if response:
             st.warning("Failed to delete record")
@@ -303,6 +368,10 @@ def recordsMetrics(df:pd.DataFrame):
 
 def budgetBreakdown():
     presets = get_bank_budget_presets()
+    if presets is False:
+        st.warning("Error, Unable to load Presets")
+        return False
+
     total = st.number_input("Expected Monthly Income", value=0.0, min_value=0.0)
 
     if total > 0.0:
@@ -325,5 +394,41 @@ def budgetBreakdown():
     )
 
     st.plotly_chart(fig_pie)
+
+def bankView():
+    transaction_types_dict, transaction_types_list = get_transaction_types()
+    if transaction_types_dict is False or transaction_types_list is False:
+        st.error("Failed to get Transaction Types")
+        return False
+
+    df = get_bank_records()
+    if df is False:
+        st.error("Failed to get Bank records")
+        return False
+
+    tab1, tab2, tab3 = st.tabs(tabs=["Records","Graph", "Budget"])
+
+    # Table
+    with tab1:
+        id = recordTable(df)
+        if id is None:
+            recordForm(df=df,
+                transaction_types=transaction_types_list,
+                transaction_types_dict=transaction_types_dict
+            )
+        else:
+            recordForm(df=df,
+                transaction_types=transaction_types_list,
+                transaction_types_dict=transaction_types_dict,
+                edit_id=id
+            )
+
+    # Graph
+    with tab2:
+        recordGraphs(df)
+
+    # Budget
+    with tab3:
+        budgetBreakdown()
 
 bankView()

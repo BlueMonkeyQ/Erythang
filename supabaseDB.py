@@ -15,14 +15,16 @@ class Supabase:
         self.supabase: Client = create_client(supabaseUrl,supabaseKey)
 
 # BANK
-    def insertBankRecord(self,name:str,amount:float,date:str,_type:str,categories:list):
+    def insertBankRecord(self,name:str,amount:float,date:str,_type:int,transaction:str,categories:str):
         try:
+            print(f"insertBankRecord name: {name} amount: {amount} date: {date} type: {_type} transaction: {transaction} categories: {categories}")
             self.supabase.from_("bank")\
             .insert({
                 "name": name,
                 "amount": amount,
                 "date": date,
                 "type": _type,
+                "transaction": transaction,
                 "categories": categories,
             })\
             .execute()
@@ -30,14 +32,16 @@ class Supabase:
             print(e)
             return False
 
-    def updateBankRecord(self,id:int,name:str,amount:float,date:str,_type:str,categories:list):
+    def updateBankRecord(self,id:int,name:str,amount:float,date:str,_type:int,transaction:str,categories:str):
         try:
+            print(f"updateBankRecord id: {id} name: {name} amount: {amount} date: {date} type: {_type} transaction: {transaction} categories: {categories}")
             self.supabase.from_("bank")\
             .update({
                 "name": name,
                 "amount": amount,
                 "date": date,
                 "type": _type,
+                "transaction": transaction,
                 "categories": categories,
             })\
             .eq(column='id',value=id)\
@@ -48,6 +52,7 @@ class Supabase:
 
     def deleteBankRecord(self,id:int):
         try:
+            print(f"deleteBankRecord id: {id}")
             self.supabase.from_("bank")\
             .delete()\
             .eq(column='id',value=id)\
@@ -62,7 +67,27 @@ class Supabase:
             .select("*")\
             .execute().data
 
+            print(f"getBankRecords: {len(records)} records")
             return records
+        except Exception as e:
+            print(e)
+            return False
+
+    def getBankRecordsDuplicate(self,data:dict):
+        try:
+            records = self.supabase.from_("bank")\
+            .select("*")\
+            .eq(column='name',value=data['name'])\
+            .eq(column='amount',value=data['amount'])\
+            .eq(column='date',value=data['date'])\
+            .execute().data
+
+            print(f"getBankRecordsDuplicate records: {records}")
+            if len(records) >= 1:
+                return True
+            else:
+                return False
+
         except Exception as e:
             print(e)
             return False

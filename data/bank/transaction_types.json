@@ -1,0 +1,17 @@
+{
+  "Transaction Types": {
+    "Gas": [],
+    "Auto": [],
+    "Groceries": [],
+    "Restaurants": [],
+    "Entertainment": [],
+    "Shopping": [],
+    "Travel": [],
+    "Health": [],
+    "Bills": [],
+    "Transfers": [],
+    "Income": ["4UHR"],
+    "Other": [],
+    "Unknown": []
+  }
+}
